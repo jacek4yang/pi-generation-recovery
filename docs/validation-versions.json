@@ -1,0 +1,20 @@
+{
+  "auditDate": "2026-10-03",
+  "node": "24.21.0",
+  "packages": {
+    "@earendil-works/pi-coding-agent": {
+      "minimum": "1.0.0",
+      "installed": "1.0.0",
+      "newest": "1.0.0",
+      "tested": ["1.0.0"]
+    },
+    "@earendil-works/pi-ai": {
+      "tested": ["1.0.0"]
+    }
+  },
+  "companions": {
+    "pi-codebuffer": "0.1.0",
+    "pi-codex-native-compaction": "0.3.2",
+    "pi-context-prune": "2.1.0"
+  }
+}

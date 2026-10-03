@@ -6,7 +6,15 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  sdk:
+    strategy:
+      fail-fast: false
+      matrix:
+        pi: ["1.0.0"] # minimum = installed daily-use = registry newest at v0.2.0 audit
+    env:
+      PI_TEST_VERSION: ${{ matrix.pi }}
+      PI_OFFLINE: "1"
+      PI_TELEMETRY: "0"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -16,6 +24,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: node --input-type=module -e 'import {VERSION} from "@earendil-works/pi-coding-agent"; if(VERSION !== process.env.PI_TEST_VERSION) process.exit(1)'
       - run: npm run check
       - run: npm run format:check
       - run: npm pack --json
@@ -23,3 +32,9 @@ jobs:
         env:
           PI_OFFLINE: "1"
           PI_TELEMETRY: "0"
+  verify:
+    needs: sdk
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.sdk.result }}" = "success"

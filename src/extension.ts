@@ -11,6 +11,11 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Journal } from "./journal.js";
 import {
+  collectJournals,
+  protectJournal,
+  retentionConfig,
+} from "./retention.js";
+import {
   adapter,
   FrontierTracker,
   hash,
@@ -21,6 +26,12 @@ import {
 } from "./state.js";
 
 export interface Metrics {
+  gcRuns: number;
+  gcDeletedFiles: number;
+  gcDeletedBytes: number;
+  gcFailures: number;
+  stateResumeAttempts: number;
+  semanticResumeAttempts: number;
   capturedGenerations: number;
   interruptedGenerations: number;
   stateResumeSuccesses: number;
@@ -49,6 +60,12 @@ export interface CaptureOptions {
   mode?: "recovery" | "capture-only";
 }
 export const newMetrics = (): Metrics => ({
+  gcRuns: 0,
+  gcDeletedFiles: 0,
+  gcDeletedBytes: 0,
+  gcFailures: 0,
+  stateResumeAttempts: 0,
+  semanticResumeAttempts: 0,
   capturedGenerations: 0,
   interruptedGenerations: 0,
   stateResumeSuccesses: 0,
@@ -185,6 +202,40 @@ export function captureExtension(options: CaptureOptions = {}) {
       },
     });
     if (!enabled) return;
+    const leases = new Map<string, () => Promise<void>>();
+    const releaseLeases = async () => {
+      for (const release of leases.values()) {
+        try {
+          await release();
+        } catch {
+          metrics.gcFailures++;
+        }
+      }
+      leases.clear();
+    };
+    let lastGc = 0;
+    const gc = async () => {
+      if (Date.now() - lastGc < 3600000) return;
+      lastGc = Date.now();
+      const result = await collectJournals(root, retentionConfig(), {
+        protectedJournals: new Set(leases.keys()),
+      });
+      for (const key of [
+        "gcRuns",
+        "gcDeletedFiles",
+        "gcDeletedBytes",
+        "gcFailures",
+      ] as const)
+        metrics[key] += result[key];
+    };
+    pi.on("session_start", async () => {
+      await releaseLeases();
+      await gc();
+    });
+    pi.on("agent_settled", async () => {
+      await releaseLeases();
+      await gc();
+    });
     pi.on("turn_start", async (e) => {
       await finish("stale");
       turn = e.turnIndex;
@@ -194,10 +245,22 @@ export function captureExtension(options: CaptureOptions = {}) {
       observation ??= adapter(e.api);
       if (observation.api === e.api) observation.observe(e.data);
     });
-    pi.on("message_start", (e, ctx) => {
+    pi.on("message_start", async (e, ctx) => {
       if (e.message.role !== "assistant") return;
       const id = randomUUID();
       const binding = identity(ctx);
+      if (process.platform === "linux") {
+        try {
+          leases.set(
+            binding.session + "/" + id + ".frames",
+            await protectJournal(root, binding.session, id),
+          );
+        } catch {
+          metrics.gcFailures++;
+          metrics.journalFailures++;
+          return;
+        }
+      }
       const journal = Journal.create(root, binding.session, id);
       journal.append({ kind: "identity", identity: binding, attemptId: id });
       observation ??= adapter(binding.api);
@@ -261,6 +324,7 @@ export function captureExtension(options: CaptureOptions = {}) {
     });
     pi.on("session_shutdown", async () => {
       await finish("stale");
+      await releaseLeases();
     });
   };
 }

@@ -1,6 +1,6 @@
 // Opt-in, bounded live validation. No production session or raw payload is written here.
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
@@ -16,6 +16,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { generationRecovery } from "../src/recovery.js";
 import { newMetrics } from "../src/extension.js";
+import { collectJournals, retentionConfig } from "../src/retention.js";
 
 if (process.env.PI_GENERATION_RECOVERY_LIVE !== "1")
   throw new Error(
@@ -38,6 +39,19 @@ assert.equal(
   "Existing Pi OAuth authentication is required",
 );
 const root = await mkdtemp(join(tmpdir(), "generation-live-"));
+const oldAgentDir = process.env.PI_CODING_AGENT_DIR;
+process.env.PI_CODING_AGENT_DIR = root;
+await mkdir(join(root, "context-prune"));
+await writeFile(
+  join(root, "context-prune", "settings.json"),
+  JSON.stringify({
+    enabled: true,
+    pruneOn: "agentic-auto",
+    summarizerModel: "default",
+    showStartupNotice: false,
+    showPruneStatusLine: false,
+  }),
+);
 const sessions: AgentSession[] = [];
 const originalFetch = globalThis.fetch;
 const jiti = createJiti(import.meta.url);
@@ -47,11 +61,23 @@ const codebuffer = (await jiti.import("pi-codebuffer/index.ts", {
 const { createExtension } = (await jiti.import(
   "pi-codex-native-compaction",
 )) as { createExtension: (config: object) => ExtensionFactory };
+const pruner = (await jiti.import("pi-context-prune", {
+  default: true,
+})) as ExtensionFactory;
 const metrics = newMetrics();
+let opaqueOnly = true;
+let interruptions = 0;
+let cutsRemaining = 0;
+let observedOpaque = false;
+let observedText = false;
+let completedItemCount = 0;
+let opaqueObservedWithoutCut = false;
 let cut = false;
 let cutHadOpaqueState = false;
 let armed = false;
 let requestCount = 0;
+const deadline = Date.now() + 600000;
+let probeFailures = 0;
 let sseResponses = 0;
 let reasoningEvents = 0;
 let textEvents = 0;
@@ -59,21 +85,34 @@ let completedReasoning = 0;
 // Test-only response-body fault injection; delegates all auth, serialization and HTTP to Pi.
 // SSE records are never logged or persisted by this shim.
 globalThis.fetch = async (...args: Parameters<typeof fetch>) => {
-  assert(requestCount < 16, "Bounded live request budget exhausted");
-  const response = await originalFetch(...args);
+  assert(requestCount < 32, "Bounded live request budget exhausted");
+  assert(Date.now() < deadline, "Live time budget exhausted");
   requestCount++;
+  const signals = [AbortSignal.timeout(Math.max(1, deadline - Date.now()))];
+  if (args[1]?.signal) signals.push(args[1].signal);
+  const response = await originalFetch(args[0], {
+    ...args[1],
+    signal: AbortSignal.any(signals),
+  });
   if (!armed || !response.ok || !response.body) return response;
   sseResponses++;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = "";
+  observedOpaque = false;
+  observedText = false;
   let reasoningDone = false;
   let shouldCut = false;
   const body = new ReadableStream<Uint8Array>(
     {
       async pull(controller) {
-        if (shouldCut) {
+        if (shouldCut && (!opaqueOnly || (observedOpaque && observedText))) {
+          interruptions++;
+          cut = true;
+          cutHadOpaqueState ||= observedOpaque;
+          cutsRemaining--;
+          armed = cutsRemaining > 0;
           controller.error(
             new TypeError("network error: controlled local interruption"),
           );
@@ -105,13 +144,11 @@ globalThis.fetch = async (...args: Parameters<typeof fetch>) => {
                   if (event.type === "response.output_text.delta") textEvents++;
                   if (
                     armed &&
+                    (!opaqueOnly || reasoningDone) &&
                     event.type === "response.output_text.delta" &&
                     event.delta
                   ) {
                     shouldCut = true;
-                    cut = true;
-                    cutHadOpaqueState = reasoningDone;
-                    armed = false;
                   }
                 } catch {
                   /* SSE keepalive / done records are not model state. */
@@ -176,6 +213,40 @@ async function make(
       }),
       codebuffer,
       createExtension({}),
+      pruner,
+      (pi) => {
+        pi.on("message_start", () => {
+          observedOpaque = false;
+          observedText = false;
+        });
+        pi.on("message_update", (e) => {
+          const a = e.assistantMessageEvent;
+          if (
+            a.type === "thinking_end" &&
+            a.partial.content.some(
+              (c) => c.type === "thinking" && !!c.thinkingSignature,
+            )
+          ) {
+            observedOpaque = true;
+            completedItemCount++;
+          }
+          if (a.type === "text_delta" && a.delta) observedText = true;
+        });
+        pi.on("tool_call", (e) => {
+          if (e.toolName === "context_prune") return;
+          if (
+            e.toolName === "codebuffer" &&
+            ["create", "read"].includes(String(e.input.action)) &&
+            e.input.name === "livecheck"
+          )
+            return;
+          return {
+            block: true,
+            reason:
+              "Live fixture allows only create/read of its own buffer and pruning",
+          };
+        });
+      },
       createCodemodeExtension({ mode: "on" }),
     ],
   });
@@ -281,6 +352,14 @@ function assertSuccess(session: AgentSession) {
         categories,
         errorLength: error.length,
         requests: requestCount,
+        completedItemCount,
+        reasoningEvents,
+        textEvents,
+        interruptions,
+        observedOpaque,
+        observedText,
+        stateResumeAttempts: metrics.stateResumeAttempts,
+        stateResumeSuccesses: metrics.stateResumeSuccesses,
       }),
     );
   }
@@ -291,27 +370,134 @@ function assertSuccess(session: AgentSession) {
 }
 const timeout = setTimeout(() => {
   for (const session of sessions) void session.abort();
-}, 180000);
+}, 600000);
 try {
   const session = await make();
   await session.prompt(
-    "Reply with a single short greeting. No tool is needed.",
+    "Write a 500-word explanation of crash-consistent coding workflows. No tools. This is a healthy baseline generation.",
   );
   assertSuccess(session);
+  console.log(JSON.stringify({ stage: "healthy-long", requestCount }));
   await session.prompt(
-    "Use codebuffer once to create a buffer named livecheck containing exactly text(42);. Do not run it. Then acknowledge completion briefly.",
+    "Use codebuffer once to create a buffer named livecheck containing exactly this source: " +
+      JSON.stringify("text(42); /* " + "durable fixture ".repeat(100) + " */") +
+      ". Do not run it. Then acknowledge completion briefly.",
   );
   assertSuccess(session);
   assert.equal(toolExecutions, 1);
+  await session.prompt(
+    "Use codebuffer read on livecheck once, then briefly acknowledge. Do not run it.",
+  );
+  assertSuccess(session);
+  assert.equal(toolExecutions, 2);
   await session.compact();
   assert(
     session.sessionManager.getBranch().some((e) => e.type === "compaction"),
   );
-  armed = true;
   await session.prompt(
-    "Write about 450 words explaining how to validate a retry mechanism without repeating side effects. Use six numbered sections and no tools.",
+    "Use context_prune once to summarize the preceding tool output, then briefly acknowledge. No other tools.",
   );
   assertSuccess(session);
+  const pruned = session.sessionManager
+    .getBranch()
+    .some(
+      (e) => e.type === "custom" && e.customType === "context-prune-frontier",
+    );
+  assert(pruned, "Actual context pruning must run");
+  for (let probe = 0; probe < 3 && !cut; probe++) {
+    armed = true;
+    cutsRemaining = 1;
+    opaqueOnly = true;
+    await session.prompt(
+      "Without tools, solve and carefully explain a retry correctness argument: a stream emits reasoning, a complete source revision, a tool result, then another interrupted assistant. Compare recovery at each boundary, derive invariants and give a rigorous 300-word test plan. Consider non-idempotent side effects and branch switches.",
+    );
+    if (
+      session.messages.filter((m) => m.role === "assistant").at(-1)
+        ?.stopReason !== "stop"
+    ) {
+      probeFailures++;
+      console.log(
+        JSON.stringify({
+          probeFailure: probe,
+          requestCount,
+          completedItemCount,
+          reasoningEvents,
+          textEvents,
+          interruptions,
+          stateResumeAttempts: metrics.stateResumeAttempts,
+        }),
+      );
+    }
+    opaqueObservedWithoutCut ||= observedOpaque && !cut;
+    armed = false;
+  }
+  const targetedStateResumeSuccesses = metrics.stateResumeSuccesses;
+  const canonicalRecoveryPersisted = session.sessionManager
+    .getBranch()
+    .some(
+      (e) =>
+        e.type === "custom" &&
+        e.customType === "pi-generation-recovery.v1" &&
+        (e.data as { state?: string }).state === "canonicalized",
+    );
+  if (targetedStateResumeSuccesses)
+    assert(
+      canonicalRecoveryPersisted,
+      "Recovered assistant canonicalization must be durable",
+    );
+  assert(
+    !session.messages.some(
+      (m) =>
+        m.role === "user" &&
+        JSON.stringify(m.content).includes(
+          "The preceding assistant prefix is committed",
+        ),
+    ),
+  );
+  console.log(
+    JSON.stringify({
+      stage: "opaque-probes",
+      requestCount,
+      cut,
+      completedItemCount,
+      stateResumeAttempts: metrics.stateResumeAttempts,
+      stateResumeSuccesses: metrics.stateResumeSuccesses,
+    }),
+  );
+  if (!cut) {
+    opaqueOnly = false;
+    armed = true;
+    cutsRemaining = 1;
+    await session.prompt(
+      "Write 500 words on crash consistency in coding agents, without tools.",
+    );
+  }
+  // Two local cuts exhaust the one-retry budget; no extension may create a third request.
+  opaqueOnly = false;
+  armed = true;
+  cutsRemaining = 2;
+  const beforeRepeated = requestCount;
+  await session.prompt(
+    "Explain durable state transitions in 400 words without tools.",
+  );
+  assert.equal(requestCount - beforeRepeated, 2);
+  assert.equal(
+    session.messages.filter((m) => m.role === "assistant").at(-1)?.stopReason,
+    "error",
+  );
+  armed = false;
+  console.log(
+    JSON.stringify({
+      stage: "repeated-fault-bounded",
+      requestCount,
+      stateResumeSuccesses: metrics.stateResumeSuccesses,
+    }),
+  );
+  await session.prompt(
+    "Give one short sentence confirming this is a new ordinary turn, no tools.",
+  );
+  assertSuccess(session);
+  await session.compact();
   console.log(
     JSON.stringify({
       liveInterruptionProbe: {
@@ -325,8 +511,9 @@ try {
     }),
   );
   assert(cut, "Controlled local text-stream cut must occur");
-  assert.equal(metrics.stateResumeSuccesses, cutHadOpaqueState ? 1 : 0);
-  assert.equal(toolExecutions, 1);
+  if (cutHadOpaqueState) assert(metrics.stateResumeAttempts >= 1);
+  if (targetedStateResumeSuccesses) assert(metrics.stateResumeSuccesses >= 1);
+  assert.equal(toolExecutions, 2);
   const file = session.sessionManager.getSessionFile()!;
   session.dispose();
   const reopened = await make(SessionManager.open(file));
@@ -334,11 +521,18 @@ try {
     "Use codebuffer read on livecheck, then acknowledge its existence in one sentence. Do not run it.",
   );
   assertSuccess(reopened);
-  assert.equal(toolExecutions, 2);
+  assert.equal(toolExecutions, 3);
+  await mkdir(join(root, "journals", "expired"));
+  const oldFile = join(root, "journals", "expired", "old.frames");
+  await writeFile(oldFile, "truncated diagnostic", { mode: 0o600 });
+  await utimes(oldFile, 0, 0);
+  const gc = await collectJournals(join(root, "journals"), retentionConfig());
+  assert.equal(gc.gcDeletedFiles, 1);
   console.log(
     JSON.stringify(
       {
         live: true,
+        gc,
         model: model.id,
         api: model.api,
         healthy: true,
@@ -347,6 +541,16 @@ try {
         controlledInterruption: cut,
         cutHadOpaqueState,
         stateResume: metrics.stateResumeSuccesses,
+        stateResumeAttempts: metrics.stateResumeAttempts,
+        targetedStateResumeSuccesses,
+        canonicalRecoveryPersisted,
+        probeFailures,
+        ordinaryFallbacks: metrics.fullRetryFallbacks,
+        completedItemCount,
+        opaqueObservedWithoutCut,
+        interruptions,
+        pruned,
+        repeatedInterruptionBounded: true,
         reopen: true,
         requestCount,
         toolExecutions,
@@ -357,8 +561,23 @@ try {
     ),
   );
 } finally {
+  console.log(
+    JSON.stringify({
+      liveFinalCounters: {
+        requestCount,
+        interruptions,
+        completedItemCount,
+        stateResumeAttempts: metrics.stateResumeAttempts,
+        stateResumeSuccesses: metrics.stateResumeSuccesses,
+        fullRetryFallbacks: metrics.fullRetryFallbacks,
+        usage: metrics.usage,
+      },
+    }),
+  );
   clearTimeout(timeout);
   globalThis.fetch = originalFetch;
+  if (oldAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = oldAgentDir;
   sessions.forEach((s) => s.dispose());
   await rm(root, { recursive: true, force: true });
 }
