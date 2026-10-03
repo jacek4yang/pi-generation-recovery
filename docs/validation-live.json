@@ -1,0 +1,22 @@
+{
+  "live": true,
+  "model": "gpt-6-astra",
+  "api": "openai-codex-responses",
+  "healthy": true,
+  "nativeCompaction": true,
+  "codebuffer": true,
+  "controlledInterruption": true,
+  "cutHadOpaqueState": false,
+  "stateResume": 0,
+  "reopen": true,
+  "requestCount": 8,
+  "toolExecutions": 2,
+  "usage": {
+    "input": 3558,
+    "output": 699,
+    "cacheRead": 5504,
+    "cacheWrite": 0,
+    "reportedReasoningTokens": 0,
+    "reasoningUsageReports": 6
+  }
+}
