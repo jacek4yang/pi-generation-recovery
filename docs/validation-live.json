@@ -1,22 +1,46 @@
 {
-  "live": true,
+  "release": "0.2.0",
+  "pi": "1.0.0",
+  "node": "24.21.0",
   "model": "gpt-6-astra",
   "api": "openai-codex-responses",
-  "healthy": true,
-  "nativeCompaction": true,
+  "thinking": "medium",
+  "limits": {
+    "requests": 32,
+    "seconds": 600,
+    "opaqueProbes": 3
+  },
+  "completeSoak": true,
+  "healthyLongGeneration": true,
+  "nativeCompactionBeforeAndAfter": true,
   "codebuffer": true,
+  "contextPruner": "2.1.0",
+  "pruned": true,
   "controlledInterruption": true,
-  "cutHadOpaqueState": false,
-  "stateResume": 0,
+  "cutHadOpaqueState": true,
+  "completedReasoningItems": 3,
+  "stateResumeAttempts": 2,
+  "stateResumeSuccesses": 1,
+  "targetedStateResumeSuccesses": 1,
+  "canonicalRecoveryPersisted": true,
+  "ordinaryFallbacks": 1,
+  "interruptions": 3,
+  "repeatedInterruptionBounded": true,
   "reopen": true,
-  "requestCount": 8,
-  "toolExecutions": 2,
+  "requestCount": 16,
+  "toolExecutions": 3,
+  "gc": {
+    "gcRuns": 1,
+    "gcDeletedFiles": 1,
+    "gcDeletedBytes": 20,
+    "gcFailures": 0
+  },
   "usage": {
-    "input": 3558,
-    "output": 699,
-    "cacheRead": 5504,
+    "input": 15948,
+    "output": 1794,
+    "cacheRead": 14720,
     "cacheWrite": 0,
     "reportedReasoningTokens": 0,
-    "reasoningUsageReports": 6
+    "reasoningUsageReports": 11
   }
 }
