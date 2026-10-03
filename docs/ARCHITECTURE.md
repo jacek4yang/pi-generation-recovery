@@ -10,7 +10,7 @@ The frontier distinguishes absent work, partial/complete reasoning, text and too
 
 ## Retry authorization and ordering
 
-Verified against the actual Pi 1.0.0 SDK:
+Verified against the actual Pi 1.0.1 SDK:
 
 1. `message_start` / `message_update` capture normalized frames; provider events independently establish authoritative completion.
 2. `message_end` flushes the journal and records metadata **before assistant persistence**. An eligible interruption queues an empty hidden custom message with `triggerTurn: false`.

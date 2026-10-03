@@ -25,7 +25,7 @@ try {
     join(dir, "package.json"),
     JSON.stringify({ private: true, type: "module", dependencies }),
   );
-  await writeFile(join(dir, ".npmrc"), "allow-remote=root\n");
+  await writeFile(join(dir, ".npmrc"), "allow-git=root\n");
   execFileSync(
     "npm",
     ["install", "--no-audit", "--no-fund", "--ignore-scripts"],

@@ -1,6 +1,6 @@
 # pi-generation-recovery
 
-State-aware interrupted-generation recovery for **Pi 1.0.0 / Node >= 24**. Pi remains the retry owner; this extension preserves safely replayable model work when Pi authorizes a retry. No telemetry, provider replacement, authentication, tool execution, or compaction layer.
+State-aware interrupted-generation recovery for **Pi 1.0.1 / Node >= 24**. Pi remains the retry owner; this extension preserves safely replayable model work when Pi authorizes a retry. No telemetry, provider replacement, authentication, tool execution, or compaction layer.
 
 ## Install
 
@@ -60,7 +60,7 @@ Optional companions are not runtime dependencies. Recovery does not alter their 
 
 ## Validation and limits
 
-The public Pi retry/omission lifecycle is pinned to **1.0.0**: minimum, installed daily-use, and newest registry version all matched at validation time. Other versions are rejected clearly until tested. This is not a universal compatibility or quality guarantee. A bounded new-request replay preserves exposed state, not a documented same-response cursor.
+The public Pi retry/omission lifecycle is pinned to **1.0.1**: minimum, installed daily-use, and newest registry version all matched at validation time. Other versions are rejected clearly until tested. This is not a universal compatibility or quality guarantee. A bounded new-request replay preserves exposed state, not a documented same-response cursor.
 
 A bounded isolated real Codex soak passed with all four plugins, one **successful state-preserving recovery**, controlled repeated failures bounded by Pi, session reopen and GC. See [sanitized evidence](docs/validation-live.json). Deterministic real-SDK tests and installed-tarball tests cover unsafe fallbacks and plugin ordering.
 
