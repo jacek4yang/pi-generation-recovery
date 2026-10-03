@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — safe completed frontier
+
+- Replace whole-generation vetoes with a journal-bound safe-prefix plan. Match completed reasoning signatures to authoritative provider items; allow reasoning-only state replay.
+- Discard incomplete reasoning and all tool-call tails before frame reduction. Never parse partial arguments into an action or replay tool execution.
+- Carry prior committed state across repeated text/reasoning/tool interruptions, even when a later attempt completes no new items; preserve Pi omission authorization and identity guards.
+- Separate padded public visible-token estimation from conservatively budgeted opaque signatures, and add safe-prefix/drop/fallback/unknown-usage metrics.
+- Add real-SDK boundary and inherited-prefix regressions, strengthen companion-order fixtures, and reject stale same-version tarballs in package smoke.
+- Bounded real Astra/medium probes: five controlled interruptions, five advanced attempts, four successful recovered settlements, zero full-retry fallback. No natural interruptions or later-reasoning tail observed; no token/billing savings claim.
+
 ## 0.2.0
 
 - Add conservative opportunistic journal retention (7 days / 1 GiB), per-attempt active leases, Linux descriptor-anchored symlink-safe GC, bounded scans and local GC metrics.

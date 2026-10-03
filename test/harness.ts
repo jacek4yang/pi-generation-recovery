@@ -22,7 +22,8 @@ import { getModel } from "@earendil-works/pi-ai/compat";
 
 export type Script = {
   text?: string;
-  reasoning?: "partial" | "complete";
+  reasoning?: "partial" | "complete" | ("partial" | "complete")[];
+  textComplete?: boolean;
   tool?: { name: string; args: string; partial?: boolean };
   fail?: boolean;
   terminalError?: string;
@@ -85,32 +86,38 @@ export async function harness(
       output.push(item);
       send({ type: "response.output_item.done", output_index: 0, item });
     }
-    if (script.reasoning) {
+    for (const [ri, status] of (Array.isArray(script.reasoning)
+      ? script.reasoning
+      : script.reasoning
+        ? [script.reasoning]
+        : []
+    ).entries()) {
+      const index = output.length;
       const item = {
         type: "reasoning",
-        id: "rs_" + n,
+        id: "rs_" + n + "_" + ri,
         summary: [{ type: "summary_text", text: "fixture reasoning" }],
         encrypted_content: "opaque-fixture-not-real",
       };
       send({
         type: "response.output_item.added",
-        output_index: 0,
+        output_index: index,
         item: { type: "reasoning", id: item.id, summary: [] },
       });
       send({
         type: "response.reasoning_summary_part.added",
-        output_index: 0,
+        output_index: index,
         summary_index: 0,
         part: { type: "summary_text", text: "" },
       });
       send({
         type: "response.reasoning_summary_text.delta",
-        output_index: 0,
+        output_index: index,
         summary_index: 0,
         delta: "fixture reasoning",
       });
-      if (script.reasoning === "complete")
-        send({ type: "response.output_item.done", output_index: 0, item });
+      if (status === "complete")
+        send({ type: "response.output_item.done", output_index: index, item });
       output.push(item);
     }
     if (script.text !== undefined) {
@@ -140,7 +147,7 @@ export async function harness(
           content_index: 0,
           delta: script.text.slice(i, i + 127),
         });
-      if (!script.fail)
+      if (!script.fail || script.textComplete)
         send({ type: "response.output_item.done", output_index: index, item });
       output.push(item);
     }

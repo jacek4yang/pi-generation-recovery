@@ -34,6 +34,11 @@ export interface Metrics {
   semanticResumeAttempts: number;
   capturedGenerations: number;
   interruptedGenerations: number;
+  recoverableSafePrefixes: number;
+  completedReasoningItemsPreserved: number;
+  unsafeReasoningItemsDropped: number;
+  partialToolCallsDropped: number;
+  fallbackReasons: Record<string, number>;
   stateResumeSuccesses: number;
   semanticResumeSuccesses: number;
   fullRetryFallbacks: number;
@@ -50,6 +55,7 @@ export interface Metrics {
     cacheWrite: number;
     reportedReasoningTokens: number;
     reasoningUsageReports: number;
+    unknownInterruptedUsageReports: number;
   };
 }
 export interface CaptureOptions {
@@ -68,6 +74,11 @@ export const newMetrics = (): Metrics => ({
   semanticResumeAttempts: 0,
   capturedGenerations: 0,
   interruptedGenerations: 0,
+  recoverableSafePrefixes: 0,
+  completedReasoningItemsPreserved: 0,
+  unsafeReasoningItemsDropped: 0,
+  partialToolCallsDropped: 0,
+  fallbackReasons: {},
   stateResumeSuccesses: 0,
   semanticResumeSuccesses: 0,
   fullRetryFallbacks: 0,
@@ -84,6 +95,7 @@ export const newMetrics = (): Metrics => ({
     cacheWrite: 0,
     reportedReasoningTokens: 0,
     reasoningUsageReports: 0,
+    unknownInterruptedUsageReports: 0,
   },
 });
 export function captureExtension(options: CaptureOptions = {}) {
@@ -137,8 +149,10 @@ export function captureExtension(options: CaptureOptions = {}) {
       if (!a) return;
       active = undefined;
       clearInterval(a.timer);
+      const plan = a.tracker.plan(a.adapter, a.reasoning);
       a.journal.append({
         kind: "settlement",
+        plan,
         state,
         failure,
         usage,
@@ -147,7 +161,7 @@ export function captureExtension(options: CaptureOptions = {}) {
       await a.journal.close();
       const failed = a.invalid || a.journal.failed;
       if (failed) metrics.journalFailures++;
-      const candidate = a.tracker.candidate(a.adapter, a.reasoning);
+      const candidate = plan.candidate;
       const cp: GenerationCheckpoint = {
         schema: 1,
         owner: OWNER,
@@ -161,11 +175,18 @@ export function captureExtension(options: CaptureOptions = {}) {
         journal: join(a.identity.session, a.id + ".frames"),
         strategy: failure === "error" ? "full-pi-retry" : "none",
         candidate: failed ? "none" : candidate,
+        plan,
         ...(failure ? { failure } : {}),
         ...(usage ? { usage } : {}),
       };
       if (failure) {
         metrics.interruptedGenerations++;
+        if (!failed && plan.candidate !== "none")
+          metrics.recoverableSafePrefixes++;
+        metrics.unsafeReasoningItemsDropped += plan.unsafeReasoningItemsDropped;
+        metrics.partialToolCallsDropped += plan.partialToolCallsDropped;
+        if (!usage || usage.totalTokens === 0)
+          metrics.usage.unknownInterruptedUsageReports++;
         if (failure === "error") metrics.fullRetryFallbacks++;
         if (a.tracker.hasTools) metrics.toolCallRecoveriesRefused++;
       }

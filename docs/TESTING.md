@@ -26,6 +26,16 @@ The complete recorded soak passed: healthy long generation, CodeBuffer before/af
 
 One successful bounded soak is evidence, not a guarantee of every model/provider state or indefinite production stability. Live output quality and token economy are not benchmarked against a full-retry control.
 
+## Safe-frontier live probes
+
+`PI_GENERATION_RECOVERY_LIVE=1 node --import tsx scripts/live-prefix.ts /tmp/prefix-report.json` caps each run at **10 requests / 360 seconds**, output deltas at 12000 characters per response, Pi retries at two and provider retries at zero. `PI_LIVE_PREFIX_CASE=tool` restricts the run to chained tool-tail cuts. Only an in-memory `report_result` fixture tool is allowed; no workspace execution occurs. The shim verifies signed prefix hashes in actual outgoing retry input and rejects any discarded tool-call item ID. It does not initiate retry requests.
+
+Recorded across the exercise: 17 requests (2 preliminary healthy requests exposed no eligible reasoning; 8 main probes; 4 focused chaining requests; 3 final-visible-answer review requests). Five injected interruptions produced five advanced attempts and four successful recovered settlements, with zero full-retry fallback. One two-cut chain inherited the same reasoning when the second failed attempt contributed no completed state. No natural interruptions were observed. The later-reasoning target was not encountered in live streams; deterministic SSE tests cover it, including inheritance without new completed items. Exact signature comparison uses memory only; private temporary journals are removed. Aggregate evidence is in `validation-safe-prefix.json`.
+
+State preservation is proven by exact replay and successful canonical completion, not a measured output-token saving. Provider usage was absent/zero on interrupted attempts (five unknown reports); the reported reasoning tokens on successful responses do not measure avoided work. The final visible answer of the separate reasoning-frontier probe was manually reviewed: it coherently identified publication/reclamation races, supplied the per-slot phase repair and correctly warned about stalled-reservation progress. This is not a general quality guarantee or a quality/billing A/B comparison. Optional `PI_LIVE_REVIEW_TEXT=1` prints only that synthetic fixture's final visible answer, never opaque state or tool arguments.
+
+The deterministic safe-prefix matrix asserts reasoning-only input items, multiple completed items, partial reasoning/tool tails, complete text, no-output boundaries, all chained tail kinds, stale identities, insufficient headroom and invalid journals. Companion ordering tests now also recover reasoning-only prefixes before partial reasoning/tool tails without mutating native checkpoints or executing discarded arguments.
+
 ## Separate local overhead measurements
 
 - `npx tsx scripts/benchmark.ts`: journal serialization/hash/append/terminal sync only. Recorded 5000 frames, 1,338,890 bytes, 44.741 ms (8.948 microseconds/frame).
