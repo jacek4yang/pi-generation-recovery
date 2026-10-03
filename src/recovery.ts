@@ -330,8 +330,10 @@ export function generationRecovery(options: CaptureOptions = {}) {
       p.applied = true;
       metrics.fullRetryFallbacks--;
       metrics.replayedInputBytes += p.bytes;
-      if (p.checkpoint.candidate === "state-preserving")
+      if (p.checkpoint.candidate === "state-preserving") {
         metrics.reasoningStateReplayed++;
+        metrics.stateResumeAttempts++;
+      } else metrics.semanticResumeAttempts++;
       pi.appendEntry(OWNER, {
         state: "replaying",
         attemptId: p.checkpoint.attemptId,
