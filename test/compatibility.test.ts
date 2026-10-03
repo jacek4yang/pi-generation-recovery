@@ -86,8 +86,18 @@ for (const buffers of [false, true])
             // Failure follows the canonical tool result (or its native checkpoint), never precedes it.
             h.scripts.push(
               {
-                reasoning: "complete",
-                text: "preserved prefix ".repeat(350),
+                reasoning: reverse
+                  ? ["complete", "complete"]
+                  : ["complete", "complete", "partial"],
+                ...(reverse
+                  ? {
+                      tool: {
+                        name: "codebuffer",
+                        args: '{"DISCARDED_ARGUMENT":',
+                        partial: true,
+                      },
+                    }
+                  : {}),
                 fail: true,
               },
               { text: "continuation conclusion" },
@@ -168,6 +178,15 @@ for (const buffers of [false, true])
               JSON.stringify(p.input).includes("do not regenerate"),
             );
             assert(resumed);
+            assert.equal(
+              (resumed.input as { type?: string }[]).filter(
+                (i) => i.type === "reasoning",
+              ).length,
+              2,
+            );
+            assert(
+              !JSON.stringify(resumed.input).includes("DISCARDED_ARGUMENT"),
+            );
             if (buffers)
               assert(
                 JSON.stringify(resumed.input).includes(

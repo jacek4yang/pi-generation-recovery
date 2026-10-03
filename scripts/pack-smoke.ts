@@ -39,6 +39,20 @@ try {
   ) as { version: string; pi: { extensions: string[] } };
   assert.equal(installed.version, manifest.version);
   assert.deepEqual(installed.pi.extensions, ["./index.ts"]);
+  // Version equality alone does not distinguish a stale same-version tarball.
+  const sources = [
+    "index.ts",
+    ...(await readdir("src")).map((f) => "src/" + f),
+  ];
+  for (const file of sources) {
+    const packaged = await readFile(
+      join(dir, "node_modules/pi-generation-recovery", file),
+    ).catch(() => undefined);
+    assert(
+      packaged?.equals(await readFile(file)),
+      "Stale/missing packaged source: " + file + "; run npm pack first",
+    );
+  }
   await mkdir(join(dir, "test"));
   for (const file of await readdir("test")) {
     if (!file.endsWith(".ts")) continue;

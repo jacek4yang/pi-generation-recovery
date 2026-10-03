@@ -5,24 +5,25 @@ State-aware interrupted-generation recovery for **Pi 1.0.0 / Node >= 24**. Pi re
 ## Install
 
 ```sh
-pi install git:github.com/jacek4yang/pi-generation-recovery@v0.2.0
+pi install git:github.com/jacek4yang/pi-generation-recovery
 ```
 
 Restart Pi or reload extensions. No npm publication. The public source entry is `index.ts`.
 
 ## Recovery policy
 
-Advanced recovery in v0.2.0 supports **openai-codex-responses** only.
+Advanced recovery supports **openai-codex-responses** only. The safe-frontier update preserves completed state before an unsafe tail; it does not resume an incomplete action.
 
-| Interrupted generation                                   | Behavior                                             |
-| -------------------------------------------------------- | ---------------------------------------------------- |
-| Completed opaque reasoning item + assistant text         | State-preserving resume through canonical Pi context |
-| Pure-text model + at least 4 KiB text                    | Semantic continuation                                |
-| Missing/incomplete reasoning, no meaningful output       | Ordinary Pi retry                                    |
-| Any tool-call content                                    | Ordinary Pi retry; never execute/replay tools        |
-| Abort, exhausted/disabled retry, non-retryable error     | No extra request                                     |
-| Changed identity, insufficient headroom, journal failure | Fail closed; ordinary Pi behavior                    |
-| Other provider APIs                                      | Capture only                                         |
+| Interrupted generation                                    | Behavior                                                                             |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Completed verified opaque reasoning, with or without text | State-preserving recovery through canonical Pi context                               |
+| Completed prefix followed by incomplete reasoning         | Preserve the prefix; discard incomplete reasoning and everything after it            |
+| Completed prefix followed by any tool call                | Preserve earlier state; discard the entire tool-call tail; generate new calls afresh |
+| Pure-text model + at least 4 KiB safe text                | Semantic continuation                                                                |
+| No safe prefix, incomplete reasoning alone                | Ordinary Pi retry                                                                    |
+| Abort, exhausted/disabled retry, non-retryable error      | No extra request                                                                     |
+| Changed identity, insufficient headroom, journal failure  | Fail closed; ordinary Pi behavior                                                    |
+| Other provider APIs                                       | Capture only                                                                         |
 
 There is no documented reliable same-response cursor for the supported subscription channel. State resume is a **new request**, preserving completed exposed reasoning and the entire committed prefix; it cannot guarantee identical internal inference or identical quality. Incomplete reasoning summaries are never treated as complete reasoning state. Context overflow remains Pi/native compaction territory.
 
@@ -38,7 +39,9 @@ Successful recovery persists a combined canonical assistant response. Only suffi
 - `PI_GENERATION_RECOVERY_MAX_TOTAL_BYTES=1073741824`: best-effort total quota; 0 disables size eviction.
 - `/generation-recovery`: show process-local recovery attempts/successes, GC counters and reported usage.
 
-Retry enablement, budget and backoff are configured in Pi, not here. Metrics distinguish reported input/output/cache/reasoning usage from replayed bytes. Exact repeated bytes removed from the transcript are **not token or billing savings**. Failed streams may have no usage report.
+Retry enablement, budget and backoff are configured in Pi, not here. Metrics distinguish reported input/output/cache/reasoning usage from replayed bytes. Exact repeated bytes removed from the transcript are **not token or billing savings**. Failed streams may have no usage report. Zero/absent usage is counted as unknown interrupted work, not zero work. Metrics separately count recoverable interruptions, state attempts/successful settlements, reasoning items preserved per replay, dropped unsafe reasoning/tool items, replay bytes and full-retry reasons. A chained recovery can have two attempts but one successful settlement; these are deliberately different denominators.
+
+`fullRetryFallbacks` retains its legacy meaning: interrupted attempts not upgraded to advanced recovery, including cases where Pi never authorizes retry. It is not an independently issued request count. `toolCallRecoveriesRefused` counts unsafe action boundaries, not a veto on earlier safe reasoning. Actual replay attempts and provider requests are reported separately.
 
 ## Privacy and storage
 
@@ -57,9 +60,11 @@ Optional companions are not runtime dependencies. Recovery does not alter their 
 
 ## Validation and limits
 
-The public Pi retry/omission lifecycle is pinned to **1.0.0**: minimum, installed daily-use, and newest registry version all matched at validation time. Other versions are rejected clearly until tested. This is a conservative v0.2 daily-driver candidate, not a universal compatibility or quality guarantee.
+The public Pi retry/omission lifecycle is pinned to **1.0.0**: minimum, installed daily-use, and newest registry version all matched at validation time. Other versions are rejected clearly until tested. This is not a universal compatibility or quality guarantee. A bounded new-request replay preserves exposed state, not a documented same-response cursor.
 
 A bounded isolated real Codex soak passed with all four plugins, one **successful state-preserving recovery**, controlled repeated failures bounded by Pi, session reopen and GC. See [sanitized evidence](docs/validation-live.json). Deterministic real-SDK tests and installed-tarball tests cover unsafe fallbacks and plugin ordering.
+
+The safe-frontier update additionally passed 69 deterministic tests and a bounded Astra/medium/SSE live fault-injection exercise: 5 controlled interruptions, 5 state-preserving attempts, 4 successful recovered settlements, 0 full-retry fallbacks. Two cuts occurred in one chained tool-call generation. Each retry request contained the exact signed prefix and no discarded tool-call item. No natural network interruptions were observed. A later-reasoning tail did not occur in the real probes and is proven only by deterministic SDK fixtures. See [sanitized safe-frontier evidence](docs/validation-safe-prefix.json). No raw reasoning/signatures or tool arguments are published.
 
 Long coding workloads can benefit when replayed input replaces repeated reasoning/output generation, but input replay itself costs tokens. Cache behavior and provider-hidden work vary: **total token or billing savings are not guaranteed**. Byte counters are not token estimates.
 

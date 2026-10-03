@@ -27,7 +27,17 @@ export type Frontier =
   | "PARTIAL_TOOL_CALL"
   | "COMPLETE_TOOL_CALL"
   | "TERMINAL_COMPLETE";
+export interface RecoveryPlan {
+  safePrefix: number[];
+  droppedTailKind: Frontier | null;
+  completedReasoningItems: number;
+  unsafeReasoningItemsDropped: number;
+  partialToolCallsDropped: number;
+  visibleTextBytes: number;
+  candidate: "state-preserving" | "semantic" | "none";
+}
 export interface GenerationCheckpoint {
+  plan?: RecoveryPlan;
   schema: 1;
   owner: typeof OWNER;
   id: string;
@@ -67,6 +77,7 @@ export interface ProviderAdapter {
   capabilities: Capabilities;
   observe(data: unknown): void;
   completedReasoning: number;
+  verifiesReasoning(signature: string): boolean;
   responseId?: string;
   reasoningTokens?: number;
 }
@@ -79,6 +90,7 @@ function object(v: unknown): Record<string, unknown> | undefined {
 export function adapter(api: string): ProviderAdapter {
   const codex = api === "openai-codex-responses";
   const seen = new Set<string>();
+  const verified = new Set<string>();
   return {
     api,
     capabilities: {
@@ -90,6 +102,13 @@ export function adapter(api: string): ProviderAdapter {
       providerCursor: false,
     },
     completedReasoning: 0,
+    verifiesReasoning(signature) {
+      try {
+        return verified.has(hash(JSON.parse(signature)));
+      } catch {
+        return false;
+      }
+    },
     observe(data) {
       if (!codex) return;
       const e = object(data);
@@ -123,6 +142,7 @@ export function adapter(api: string): ProviderAdapter {
         item.encrypted_content.length > 0
       ) {
         seen.add(item.id);
+        verified.add(hash(item));
         this.completedReasoning++;
       }
     },
@@ -135,7 +155,7 @@ export class FrontierTracker {
       kind: "text" | "thinking" | "tool";
       done: boolean;
       bytes: number;
-      signature: boolean;
+      signature?: string;
     }
   >();
   terminal = false;
@@ -148,7 +168,7 @@ export class FrontierTracker {
           kind: "text",
           done: false,
           bytes: Buffer.byteLength(f.content.text),
-          signature: false,
+          signature: undefined,
         });
         break;
       case "thinking_start":
@@ -156,7 +176,7 @@ export class FrontierTracker {
           kind: "thinking",
           done: false,
           bytes: Buffer.byteLength(f.content.thinking),
-          signature: false,
+          signature: undefined,
         });
         break;
       case "toolcall_start":
@@ -164,7 +184,7 @@ export class FrontierTracker {
           kind: "tool",
           done: false,
           bytes: 0,
-          signature: false,
+          signature: undefined,
         });
         break;
       case "text_delta":
@@ -179,7 +199,8 @@ export class FrontierTracker {
         if (b) {
           b.done = true;
           b.bytes = Buffer.byteLength(f.content);
-          b.signature = f.type === "thinking_end" && !!f.thinkingSignature;
+          b.signature =
+            f.type === "thinking_end" ? f.thinkingSignature : undefined;
         }
         break;
       }
@@ -221,26 +242,64 @@ export class FrontierTracker {
     if (this.completeReasoning) return "COMPLETE_REASONING";
     return "NOTHING_RECEIVED";
   }
+  plan(a: ProviderAdapter, reasoningModel: boolean): RecoveryPlan {
+    const blocks = [...this.blocks.entries()].sort(([i], [j]) => i - j);
+    const result: RecoveryPlan = {
+      safePrefix: [],
+      droppedTailKind: null,
+      completedReasoningItems: 0,
+      unsafeReasoningItemsDropped: 0,
+      partialToolCallsDropped: 0,
+      visibleTextBytes: 0,
+      candidate: "none",
+    };
+    for (const [position, [index, b]] of blocks.entries()) {
+      const safeReasoning =
+        b.kind === "thinking" &&
+        b.done &&
+        b.signature &&
+        a.verifiesReasoning(b.signature);
+      // Visible text is harmless to commit, including a final partial text block.
+      // An unfinished non-final block is a barrier, never jump past it.
+      const safeText =
+        b.kind === "text" && (b.done || position === blocks.length - 1);
+      if (
+        result.droppedTailKind === null &&
+        index === result.safePrefix.length &&
+        (safeReasoning || safeText)
+      ) {
+        result.safePrefix.push(index);
+        if (safeReasoning) result.completedReasoningItems++;
+        if (safeText) result.visibleTextBytes += b.bytes;
+      } else {
+        result.droppedTailKind ??=
+          b.kind === "tool"
+            ? b.done
+              ? "COMPLETE_TOOL_CALL"
+              : "PARTIAL_TOOL_CALL"
+            : b.kind === "thinking"
+              ? "PARTIAL_REASONING"
+              : "PARTIAL_TEXT";
+        if (b.kind === "thinking") result.unsafeReasoningItemsDropped++;
+        if (b.kind === "tool" && !b.done) result.partialToolCallsDropped++;
+      }
+    }
+    if (!this.terminal && a.capabilities.assistantPrefixReplay) {
+      if (
+        result.completedReasoningItems > 0 &&
+        a.capabilities.opaqueReasoningReplay
+      )
+        result.candidate = "state-preserving";
+      else if (!reasoningModel && result.visibleTextBytes >= 4096)
+        result.candidate = "semantic";
+    }
+    return result;
+  }
   candidate(
     a: ProviderAdapter,
     reasoningModel: boolean,
   ): GenerationCheckpoint["candidate"] {
-    if (
-      this.terminal ||
-      this.hasTools ||
-      this.partialReasoning ||
-      !a.capabilities.assistantPrefixReplay
-    )
-      return "none";
-    if (
-      this.textBytes > 0 &&
-      this.completeReasoning > 0 &&
-      this.completeReasoning === a.completedReasoning &&
-      a.capabilities.opaqueReasoningReplay
-    )
-      return "state-preserving";
-    if (!reasoningModel && this.textBytes >= 4096) return "semantic";
-    return "none";
+    return this.plan(a, reasoningModel).candidate;
   }
 }
 export function matchesIdentity(a: Identity, b: Identity): boolean {

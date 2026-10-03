@@ -6,6 +6,7 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJournal } from "./journal.js";
+import { replayEstimate } from "./headroom.js";
 import type {
   BoundaryState,
   ExtensionAPI,
@@ -26,13 +27,14 @@ import {
 } from "./state.js";
 
 const INSTRUCTION =
-  "The preceding assistant prefix is committed output from this same interrupted generation. Continue exactly where it stopped; do not regenerate or summarize the committed prefix. Preserve its decisions and completed reasoning state. Finish the original task with unchanged quality. Do not repeat tool actions from the transcript.";
+  "The preceding assistant prefix is committed output from this same interrupted generation. Continue from that safe frontier; do not regenerate or summarize the committed prefix. Preserve its decisions and completed reasoning state. Any incomplete reasoning or tool-call tail was discarded, not executed. Generate any necessary next tool call afresh. Finish the original task with unchanged quality. Do not repeat tool actions from the transcript.";
 interface Pending {
   checkpoint: GenerationCheckpoint;
   prefix: AssistantMessage;
   failedId?: string;
   applied: boolean;
   bytes: number;
+  estimatedTokens: number;
 }
 function ownedMarker(e: SessionEntry, id?: string): boolean {
   return (
@@ -85,13 +87,28 @@ export function generationRecovery(options: CaptureOptions = {}) {
       },
     })(pi);
     if (!enabled) return;
+    const reasons = new WeakMap<GenerationCheckpoint, string>();
+    function fallback(cp: GenerationCheckpoint, reason?: string) {
+      const old = reasons.get(cp);
+      if (old)
+        metrics.fallbackReasons[old] = Math.max(
+          0,
+          (metrics.fallbackReasons[old] ?? 0) - 1,
+        );
+      if (reason) {
+        reasons.set(cp, reason);
+        metrics.fallbackReasons[reason] =
+          (metrics.fallbackReasons[reason] ?? 0) + 1;
+      } else reasons.delete(cp);
+    }
     const stale = () => {
       if (pending) {
         metrics.staleCheckpointsRejected++;
+        fallback(pending.checkpoint, "identity-or-branch-changed");
         pending = undefined;
       }
     };
-    function fits(bytes: number, ctx: ExtensionContext): boolean {
+    function fits(estimatedTokens: number, ctx: ExtensionContext): boolean {
       const window = ctx.model?.contextWindow ?? 0;
       // Post-compaction usage can be unknown. Bound ALL persisted branch bytes, including
       // opaque native state, rather than pretending a short summary is the actual context.
@@ -106,7 +123,7 @@ export function generationRecovery(options: CaptureOptions = {}) {
         }
       }
       return hasHeadroom(
-        bytes,
+        estimatedTokens,
         used,
         window,
         Math.max(8192, ctx.model?.maxTokens ?? 0),
@@ -162,11 +179,41 @@ export function generationRecovery(options: CaptureOptions = {}) {
         const prior = pending?.applied ? pending : undefined;
         const cp = { ...last };
         pending = undefined;
-        // A second interruption can add plain text without emitting new reasoning.
-        // The previously replayed, completed state remains available; partial reasoning/tools do not.
-        if (prior && cp.frontier === "PARTIAL_TEXT" && cp.candidate === "none")
+        fallback(cp, "pi-retry-not-authorized");
+        if (
+          prior &&
+          [
+            "session",
+            "source",
+            "provider",
+            "api",
+            "model",
+            "thinking",
+            "systemHash",
+            "toolsHash",
+          ].some(
+            (k) =>
+              cp.identity[k as keyof typeof cp.identity] !==
+              prior.checkpoint.identity[k as keyof typeof cp.identity],
+          )
+        ) {
+          metrics.staleCheckpointsRejected++;
+          fallback(cp, "identity-or-branch-changed");
+          return;
+        }
+        if (prior && cp.candidate === "none") {
           cp.candidate = prior.checkpoint.candidate;
-        if (cp.state !== "interrupted" || cp.candidate === "none") return;
+          if (cp.state === "interrupted") metrics.recoverableSafePrefixes++;
+        }
+        if (cp.state !== "interrupted" || cp.candidate === "none") {
+          fallback(
+            cp,
+            cp.state === "journal-failed"
+              ? "journal-invalid"
+              : "no-safe-prefix",
+          );
+          return;
+        }
         let reconstructed: AssistantMessage;
         try {
           const records = await readJournal(
@@ -184,11 +231,33 @@ export function generationRecovery(options: CaptureOptions = {}) {
           });
           if (frames.length !== cp.frameCount)
             throw new Error("Checkpoint frame count mismatch");
-          const reduced = reduceAssistantMessageFrames(frames);
-          if (!reduced) throw new Error("Empty checkpoint");
+          const settlement = records.at(-1)?.data as {
+            plan?: GenerationCheckpoint["plan"];
+          };
+          if (!cp.plan || hash(cp.plan) !== hash(settlement.plan))
+            throw new Error("Checkpoint plan mismatch");
+          const indices = cp.plan.safePrefix;
+          if (indices.some((v, i) => v !== i))
+            throw new Error("Non-contiguous safe frontier");
+          // Filter BEFORE reducing. Partial tool JSON is never parsed into an action.
+          const safeIndices = new Set(indices);
+          const safeFrames = frames.filter(
+            (f) =>
+              f.type === "start" ||
+              (safeIndices.has(f.contentIndex) &&
+                !f.type.startsWith("toolcall")),
+          );
+          const reduced = reduceAssistantMessageFrames(safeFrames);
+          if (
+            !reduced ||
+            reduced.content.length !== indices.length ||
+            reduced.content.some((c) => c.type === "toolCall")
+          )
+            throw new Error("Invalid safe frontier");
           reconstructed = reduced;
         } catch {
           metrics.journalFailures++;
+          fallback(cp, "journal-invalid");
           return;
         }
         const restored = cleanPrefix({
@@ -201,8 +270,18 @@ export function generationRecovery(options: CaptureOptions = {}) {
         const bytes =
           Buffer.byteLength(JSON.stringify(prefix.content)) +
           Buffer.byteLength(INSTRUCTION);
-        if (!fits(bytes, ctx)) return;
-        pending = { checkpoint: cp, prefix, bytes, applied: false };
+        const { estimatedTokens } = replayEstimate(prefix, INSTRUCTION);
+        if (!fits(estimatedTokens, ctx)) {
+          fallback(cp, "insufficient-headroom");
+          return;
+        }
+        pending = {
+          checkpoint: cp,
+          prefix,
+          bytes,
+          estimatedTokens,
+          applied: false,
+        };
         if (prior)
           pi.appendEntry(OWNER, {
             state: "chained",
@@ -312,7 +391,8 @@ export function generationRecovery(options: CaptureOptions = {}) {
         stale();
         return;
       }
-      if (!fits(p.bytes, ctx)) {
+      if (!fits(p.estimatedTokens, ctx)) {
+        fallback(p.checkpoint, "insufficient-headroom");
         pending = undefined;
         return;
       }
@@ -329,6 +409,10 @@ export function generationRecovery(options: CaptureOptions = {}) {
       }
       p.applied = true;
       metrics.fullRetryFallbacks--;
+      fallback(p.checkpoint);
+      metrics.completedReasoningItemsPreserved += p.prefix.content.filter(
+        (c) => c.type === "thinking",
+      ).length;
       metrics.replayedInputBytes += p.bytes;
       if (p.checkpoint.candidate === "state-preserving") {
         metrics.reasoningStateReplayed++;

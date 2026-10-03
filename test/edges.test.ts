@@ -220,7 +220,8 @@ for (const script of [
   },
 ])
   test(
-    "unsafe/nonretryable state never resumes: " + JSON.stringify(script),
+    "unsafe actions never replay; safe state needs Pi retry: " +
+      JSON.stringify(script),
     async () => {
       const metrics = newMetrics();
       let root = "";
@@ -237,7 +238,14 @@ for (const script of [
         h.scripts.push(script, { text: "normal retry" });
         await s.prompt("fixture");
         assert.equal(executions, 0);
-        assert.equal(metrics.replayedInputBytes, 0);
+        if ("tool" in script) {
+          assert.equal(metrics.stateResumeSuccesses, 1);
+          assert.equal(metrics.partialToolCallsDropped, 1);
+          const input = h.payloads[1]!.input as { type?: string }[];
+          assert.equal(input.filter((i) => i.type === "reasoning").length, 1);
+          assert(!input.some((i) => i.type === "function_call"));
+          assert(!JSON.stringify(input).includes('{\\"action\\":'));
+        } else assert.equal(metrics.replayedInputBytes, 0);
         assert.equal(h.payloads.length, "terminalError" in script ? 1 : 2);
       } finally {
         await h.close();

@@ -1,0 +1,330 @@
+{
+  "scope": "Controlled live GPT-6 Astra stream faults; not a savings or natural outage benchmark",
+  "pi": "1.0.0",
+  "node": "24.21.0",
+  "preliminary": {
+    "requests": 2,
+    "interruptions": 0,
+    "outcome": "Simple coding probe exposed no eligible completed reasoning; assertion failed and was investigated, not counted as a successful interruption probe"
+  },
+  "main": {
+    "events": {
+      "response.created": 8,
+      "response.in_progress": 8,
+      "response.output_item.added": 14,
+      "response.reasoning_summary_part.added": 7,
+      "response.reasoning_summary_text.delta": 7,
+      "response.reasoning_summary_text.done": 7,
+      "response.reasoning_summary_part.done": 7,
+      "response.output_item.done": 12,
+      "response.function_call_arguments.delta": 452,
+      "response.function_call_arguments.done": 3,
+      "response.completed": 6,
+      "response.content_part.added": 3,
+      "response.output_text.delta": 446,
+      "response.output_text.done": 3,
+      "response.content_part.done": 3
+    },
+    "reasoningOptions": [
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      }
+    ],
+    "model": "gpt-6-astra",
+    "thinking": "medium",
+    "transport": "sse",
+    "requests": 8,
+    "controlledInterruptions": 2,
+    "naturalInterruptions": 0,
+    "replayedRequests": 2,
+    "verifiedItems": 2,
+    "observedComplete": 6,
+    "toolsExecuted": 3,
+    "probes": [
+      {
+        "kind": "reasoning",
+        "requestedCuts": 1,
+        "actualCuts": 1,
+        "requests": 3,
+        "statePreservingSuccesses": 1,
+        "finished": true
+      },
+      {
+        "kind": "tool",
+        "requestedCuts": 2,
+        "actualCuts": 1,
+        "requests": 3,
+        "statePreservingSuccesses": 1,
+        "finished": true
+      },
+      {
+        "kind": "later-reasoning",
+        "requestedCuts": 1,
+        "actualCuts": 0,
+        "requests": 2,
+        "statePreservingSuccesses": 0,
+        "finished": true
+      }
+    ],
+    "metrics": {
+      "gcRuns": 3,
+      "gcDeletedFiles": 0,
+      "gcDeletedBytes": 0,
+      "gcFailures": 0,
+      "stateResumeAttempts": 2,
+      "semanticResumeAttempts": 0,
+      "capturedGenerations": 8,
+      "interruptedGenerations": 2,
+      "recoverableSafePrefixes": 2,
+      "completedReasoningItemsPreserved": 2,
+      "unsafeReasoningItemsDropped": 0,
+      "partialToolCallsDropped": 2,
+      "fallbackReasons": {
+        "pi-retry-not-authorized": 0
+      },
+      "stateResumeSuccesses": 2,
+      "semanticResumeSuccesses": 0,
+      "fullRetryFallbacks": 0,
+      "replayedInputBytes": 7704,
+      "avoidedRepeatedOutputBytes": 0,
+      "reasoningStateReplayed": 2,
+      "staleCheckpointsRejected": 0,
+      "toolCallRecoveriesRefused": 2,
+      "journalFailures": 0,
+      "usage": {
+        "input": 4091,
+        "output": 1238,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reportedReasoningTokens": 282,
+        "reasoningUsageReports": 6,
+        "unknownInterruptedUsageReports": 2
+      }
+    }
+  },
+  "chain": {
+    "events": {
+      "response.created": 4,
+      "response.in_progress": 4,
+      "response.output_item.added": 6,
+      "response.reasoning_summary_part.added": 2,
+      "response.reasoning_summary_text.delta": 2,
+      "response.reasoning_summary_text.done": 2,
+      "response.reasoning_summary_part.done": 2,
+      "response.output_item.done": 4,
+      "response.function_call_arguments.delta": 148,
+      "response.function_call_arguments.done": 1,
+      "response.completed": 2,
+      "response.content_part.added": 1,
+      "response.output_text.delta": 182,
+      "response.output_text.done": 1,
+      "response.content_part.done": 1
+    },
+    "reasoningOptions": [
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      }
+    ],
+    "model": "gpt-6-astra",
+    "thinking": "medium",
+    "transport": "sse",
+    "requests": 4,
+    "controlledInterruptions": 2,
+    "naturalInterruptions": 0,
+    "replayedRequests": 2,
+    "verifiedItems": 2,
+    "observedComplete": 2,
+    "toolsExecuted": 1,
+    "probes": [
+      {
+        "kind": "tool",
+        "requestedCuts": 2,
+        "actualCuts": 2,
+        "requests": 4,
+        "statePreservingSuccesses": 1,
+        "finished": true
+      }
+    ],
+    "metrics": {
+      "gcRuns": 1,
+      "gcDeletedFiles": 0,
+      "gcDeletedBytes": 0,
+      "gcFailures": 0,
+      "stateResumeAttempts": 2,
+      "semanticResumeAttempts": 0,
+      "capturedGenerations": 4,
+      "interruptedGenerations": 2,
+      "recoverableSafePrefixes": 2,
+      "completedReasoningItemsPreserved": 2,
+      "unsafeReasoningItemsDropped": 0,
+      "partialToolCallsDropped": 2,
+      "fallbackReasons": {
+        "pi-retry-not-authorized": 0
+      },
+      "stateResumeSuccesses": 1,
+      "semanticResumeSuccesses": 0,
+      "fullRetryFallbacks": 0,
+      "replayedInputBytes": 7288,
+      "avoidedRepeatedOutputBytes": 0,
+      "reasoningStateReplayed": 2,
+      "staleCheckpointsRejected": 0,
+      "toolCallRecoveriesRefused": 2,
+      "journalFailures": 0,
+      "usage": {
+        "input": 1407,
+        "output": 399,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reportedReasoningTokens": 52,
+        "reasoningUsageReports": 2,
+        "unknownInterruptedUsageReports": 2
+      }
+    }
+  },
+  "totals": {
+    "requests": 17,
+    "controlledInterruptions": 5,
+    "naturalInterruptions": 0,
+    "statePreservingAttempts": 5,
+    "successfulRecoveredSettlements": 4,
+    "fullRetryFallbacks": 0,
+    "unsafeToolCallsDropped": 4,
+    "unknownInterruptedUsage": 5
+  },
+  "limitations": [
+    "Real later-reasoning interruption not observed; deterministic SDK fixtures cover it",
+    "No tokenizer/billing/output-work A/B comparison",
+    "Reported successful-response reasoning tokens cannot quantify work from failed streams"
+  ],
+  "reviewed": {
+    "events": {
+      "response.created": 3,
+      "response.in_progress": 3,
+      "response.output_item.added": 3,
+      "response.reasoning_summary_part.added": 2,
+      "response.reasoning_summary_text.delta": 2,
+      "response.reasoning_summary_text.done": 2,
+      "response.reasoning_summary_part.done": 2,
+      "response.output_item.done": 3,
+      "response.function_call_arguments.delta": 138,
+      "response.function_call_arguments.done": 1,
+      "response.completed": 2,
+      "response.content_part.added": 1,
+      "response.output_text.delta": 152,
+      "response.output_text.done": 1,
+      "response.content_part.done": 1
+    },
+    "reasoningOptions": [
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      {
+        "effort": "medium",
+        "summary": "auto"
+      }
+    ],
+    "model": "gpt-6-astra",
+    "thinking": "medium",
+    "transport": "sse",
+    "requests": 3,
+    "controlledInterruptions": 1,
+    "naturalInterruptions": 0,
+    "replayedRequests": 1,
+    "verifiedItems": 1,
+    "observedComplete": 1,
+    "toolsExecuted": 1,
+    "probes": [
+      {
+        "kind": "reasoning",
+        "requestedCuts": 1,
+        "actualCuts": 1,
+        "requests": 3,
+        "statePreservingSuccesses": 1,
+        "finished": true
+      }
+    ],
+    "metrics": {
+      "gcRuns": 1,
+      "gcDeletedFiles": 0,
+      "gcDeletedBytes": 0,
+      "gcFailures": 0,
+      "stateResumeAttempts": 1,
+      "semanticResumeAttempts": 0,
+      "capturedGenerations": 3,
+      "interruptedGenerations": 1,
+      "recoverableSafePrefixes": 1,
+      "completedReasoningItemsPreserved": 1,
+      "unsafeReasoningItemsDropped": 0,
+      "partialToolCallsDropped": 0,
+      "fallbackReasons": {
+        "pi-retry-not-authorized": 0
+      },
+      "stateResumeSuccesses": 1,
+      "semanticResumeSuccesses": 0,
+      "fullRetryFallbacks": 0,
+      "replayedInputBytes": 3690,
+      "avoidedRepeatedOutputBytes": 0,
+      "reasoningStateReplayed": 1,
+      "staleCheckpointsRejected": 0,
+      "toolCallRecoveriesRefused": 0,
+      "journalFailures": 0,
+      "usage": {
+        "input": 1463,
+        "output": 309,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reportedReasoningTokens": 0,
+        "reasoningUsageReports": 2,
+        "unknownInterruptedUsageReports": 1
+      }
+    }
+  },
+  "coherenceReview": "A separate 3-request reasoning-frontier probe's final visible answer was manually reviewed: correctly identified reservation-before-publication/reclamation races, prescribed per-slot acquire/release phase sequencing and explicitly rejected a lock-free guarantee under stalled reservations. No opaque reasoning or tool arguments included."
+}
