@@ -57,7 +57,16 @@ export async function harness(
     const compact = (body.input as { type?: string }[]).some(
       (i) => i.type === "compaction_trigger",
     );
-    const script = compact ? {} : (scripts.shift() ?? { text: "fixture-ok" });
+    const summarizing = JSON.stringify(body.input).includes(
+      "<tool-call-batch>",
+    );
+    const script = compact
+      ? {}
+      : summarizing
+        ? {
+            text: "Fixture tool output summarized; source revision remains durable.",
+          }
+        : (scripts.shift() ?? { text: "fixture-ok" });
     const n = payloads.length;
     res.writeHead(200, { "content-type": "text/event-stream" });
     const send = (e: object) =>
