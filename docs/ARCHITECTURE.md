@@ -37,4 +37,4 @@ Headroom counts replay bytes conservatively as tokens plus reserve. Unknown post
 
 ## Storage cost
 
-Journal writes are asynchronous, batched (64 KiB/250 ms), bounded to 1 MiB pending and 32 MiB per attempt, with terminal flush/sync, not per-token fsync. Frame capture, hashing and one terminal sync have a real nonzero cost; no network path changes on healthy requests. Failures disable recovery, not generation. No automatic old-journal garbage collection.
+Journal writes are asynchronous, batched (64 KiB/250 ms), bounded to 1 MiB pending and 32 MiB per attempt, with terminal flush/sync, not per-token fsync. Frame capture, hashing and one terminal sync have a real nonzero cost; no network path changes on healthy requests. Failures disable recovery, not generation. v0.2.0 adds opportunistic retention/quota collection at startup and hourly settled boundaries. Per-attempt leases protect active/unresolved state without retaining all old journals in a long-lived session. See [retention](RETENTION.md) for Linux descriptor safety, scan bounds and best-effort quota semantics.

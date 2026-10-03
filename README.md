@@ -1,18 +1,18 @@
 # pi-generation-recovery
 
-State-aware interrupted-generation recovery for **Pi >= 1.0.0 / Node >= 24**. Pi remains the retry owner; this extension preserves safely replayable model work when Pi authorizes a retry. No telemetry, provider replacement, authentication, tool execution, or compaction layer.
+State-aware interrupted-generation recovery for **Pi 1.0.0 / Node >= 24**. Pi remains the retry owner; this extension preserves safely replayable model work when Pi authorizes a retry. No telemetry, provider replacement, authentication, tool execution, or compaction layer.
 
 ## Install
 
 ```sh
-pi install git:github.com/jacek4yang/pi-generation-recovery@v0.1.0
+pi install git:github.com/jacek4yang/pi-generation-recovery@v0.2.0
 ```
 
 Restart Pi or reload extensions. No npm publication. The public source entry is `index.ts`.
 
 ## Recovery policy
 
-Advanced recovery in v0.1.0 supports **openai-codex-responses** only.
+Advanced recovery in v0.2.0 supports **openai-codex-responses** only.
 
 | Interrupted generation                                   | Behavior                                             |
 | -------------------------------------------------------- | ---------------------------------------------------- |
@@ -34,7 +34,9 @@ Successful recovery persists a combined canonical assistant response. Only suffi
 - `PI_GENERATION_RECOVERY_MODE=shadow`: capture only.
 - `PI_GENERATION_RECOVERY_MODE=off`: disable capture/recovery. Unknown values also disable.
 - `PI_GENERATION_RECOVERY_DIR`: override the private journal root (default `~/.pi/agent/generation-recovery`).
-- `/generation-recovery`: show process-local counters and reported usage.
+- `PI_GENERATION_RECOVERY_RETENTION_DAYS=7`: inactive journal age limit; 0 disables age expiry.
+- `PI_GENERATION_RECOVERY_MAX_TOTAL_BYTES=1073741824`: best-effort total quota; 0 disables size eviction.
+- `/generation-recovery`: show process-local recovery attempts/successes, GC counters and reported usage.
 
 Retry enablement, budget and backoff are configured in Pi, not here. Metrics distinguish reported input/output/cache/reasoning usage from replayed bytes. Exact repeated bytes removed from the transcript are **not token or billing savings**. Failed streams may have no usage report.
 
@@ -42,7 +44,7 @@ Retry enablement, budget and backoff are configured in Pi, not here. Metrics dis
 
 Journals contain private assistant text and provider-exposed opaque reasoning signatures, like private session data. They do not contain request headers, auth tokens or raw provider event dumps. Generation content can itself contain sensitive information: protect the directory and backups. Directories/files use restrictive permissions where supported.
 
-Each append-only journal is bounded to 32 MiB, with bounded buffering; a truncated final record is ignored. Earlier committed records survive a later write failure. There is **no automatic retention policy or global disk quota** in v0.1.0. With Pi stopped, delete old session subdirectories to reclaim space; deleted journals cannot be used for recovery. Never upload journals to an issue.
+Each append-only journal is bounded to 32 MiB, with bounded buffering; a truncated final record is ignored. Earlier committed records survive a later write failure. Opportunistic GC defaults to **7 days / 1 GiB** and protects active/recovery journals. It runs at startup and at most hourly at settled boundaries, not per frame. Active data and concurrent changes can temporarily exceed quota. Linux descriptor-anchored deletion is supported; other platforms fail closed for automatic GC and require manual retention. See [retention semantics and limits](docs/RETENTION.md). Never upload journals to an issue.
 
 ## Independent durability layers
 
@@ -50,6 +52,15 @@ Optional companions are not runtime dependencies. Recovery does not alter their 
 
 - `pi-codebuffer`: revisioned program source.
 - `pi-codex-native-compaction`: long-session Codex checkpoints and provider wrapper.
+- `pi-context-prune@2.1.0`: tool-result context transformations.
 - This extension: interrupted current inference.
+
+## Validation and limits
+
+The public Pi retry/omission lifecycle is pinned to **1.0.0**: minimum, installed daily-use, and newest registry version all matched at validation time. Other versions are rejected clearly until tested. This is a conservative v0.2 daily-driver candidate, not a universal compatibility or quality guarantee.
+
+A bounded isolated real Codex soak passed with all four plugins, one **successful state-preserving recovery**, controlled repeated failures bounded by Pi, session reopen and GC. See [sanitized evidence](docs/validation-live.json). Deterministic real-SDK tests and installed-tarball tests cover unsafe fallbacks and plugin ordering.
+
+Long coding workloads can benefit when replayed input replaces repeated reasoning/output generation, but input replay itself costs tokens. Cache behavior and provider-hidden work vary: **total token or billing savings are not guaranteed**. Byte counters are not token estimates.
 
 See [architecture](docs/ARCHITECTURE.md), [failure model](docs/FAILURE_MODEL.md), [compatibility](docs/COMPATIBILITY.md), [testing](docs/TESTING.md), and [security](SECURITY.md).
