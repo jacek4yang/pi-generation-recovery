@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pi: ["1.0.0"] # minimum = installed daily-use = registry newest at v0.2.0 audit
+        pi: ["1.0.1"] # single current baseline; older versions are not supported
     env:
       PI_TEST_VERSION: ${{ matrix.pi }}
       PI_OFFLINE: "1"

@@ -11,11 +11,14 @@ import { newMetrics } from "../src/extension.js";
 import { OWNER } from "../src/state.js";
 import { harness } from "./harness.js";
 const jiti = createJiti(import.meta.url);
-const codebuffer = (await jiti.import("pi-codebuffer/index.ts", {
+const codebuffer = (await jiti.import("pi-codebuffer", {
   default: true,
 })) as ExtensionFactory;
 const { createExtension } = (await jiti.import(
-  "pi-codex-native-compaction",
+  join(
+    import.meta.dirname,
+    "../node_modules/pi-codex-native-compaction/src/index.ts",
+  ),
 )) as { createExtension: (config: object) => ExtensionFactory };
 
 for (const buffers of [false, true])

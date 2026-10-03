@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 — Pi 1.0.1 baseline
+
+- Require exactly Pi/AI 1.0.1; old versions are deliberately unsupported, not handled through compatibility branches.
+- Align peers, public version guard, CI and 69 real-SDK/packaged regressions. Use maintained unversioned Git companion fixtures.
+
 ## Unreleased — safe completed frontier
 
 - Replace whole-generation vetoes with a journal-bound safe-prefix plan. Match completed reasoning signatures to authoritative provider items; allow reasoning-only state replay.

@@ -32,11 +32,14 @@ const jiti = createJiti(import.meta.url);
 const pruner = (await jiti.import("pi-context-prune", {
   default: true,
 })) as ExtensionFactory;
-const buffer = (await jiti.import("pi-codebuffer/index.ts", {
+const buffer = (await jiti.import("pi-codebuffer", {
   default: true,
 })) as ExtensionFactory;
 const { createExtension } = (await jiti.import(
-  "pi-codex-native-compaction",
+  join(
+    import.meta.dirname,
+    "../node_modules/pi-codex-native-compaction/src/index.ts",
+  ),
 )) as { createExtension: (c: object) => ExtensionFactory };
 after(async () => {
   if (oldAgent === undefined) delete process.env.PI_CODING_AGENT_DIR;

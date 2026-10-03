@@ -1,6 +1,6 @@
 {
   "name": "pi-generation-recovery",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "State-aware Pi generation recovery with private assistant-frame checkpoints",
   "type": "module",
   "license": "MIT",
@@ -30,18 +30,18 @@
     "live": "tsx scripts/live.ts"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-coding-agent": "1.0.0"
+    "@earendil-works/pi-ai": "1.0.1",
+    "@earendil-works/pi-coding-agent": "1.0.1"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.1",
+    "@earendil-works/pi-coding-agent": "1.0.1",
     "@types/node": "^24.0.0",
     "eslint": "^9.0.0",
     "jiti": "^2.6.1",
-    "pi-codebuffer": "https://codeload.github.com/jacek4yang/pi-codebuffer/tar.gz/e46b4b33e592b7ff5bc8681399937646ce6d1cb3",
-    "pi-codex-native-compaction": "https://github.com/jacek4yang/pi-codex-native-compaction/releases/download/v0.3.2/pi-codex-native-compaction-0.3.2.tgz",
-    "pi-context-prune": "2.1.0",
+    "pi-codebuffer": "git+https://github.com/jacek4yang/pi-codebuffer.git",
+    "pi-codex-native-compaction": "git+https://github.com/jacek4yang/pi-codex-native-compaction.git",
+    "pi-context-prune": "git+https://github.com/jacek4yang/pi-context-prune.git",
     "prettier": "^3.0.0",
     "tsx": "^4.20.0",
     "typebox": "^1.0.0",
