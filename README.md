@@ -60,7 +60,7 @@ Optional companions are not runtime dependencies. Recovery does not alter their 
 
 ## Validation and limits
 
-The tested public Pi retry/omission baseline is **1.0.2**. Runtime and peer dependencies accept stable **~1.0.2** patches, while CI pins the tested floor. Older versions, prereleases and new minor versions are rejected; future patches are permitted, not claimed to have been tested. This is not a universal compatibility or quality guarantee. A bounded new-request replay preserves exposed state, not a documented same-response cursor.
+The tested public Pi retry/omission baseline is **1.0.2**. Pi peers are unrestricted (`*`) and runtime validates required APIs rather than version labels. CI/dev dependencies remain pinned only to reproduce testing. Users may upgrade independently; untested versions are not guaranteed compatible. This is not a universal compatibility or quality guarantee. A bounded new-request replay preserves exposed state, not a documented same-response cursor.
 
 A bounded isolated real Codex soak passed with all four plugins, one **successful state-preserving recovery**, controlled repeated failures bounded by Pi, session reopen and GC. See [sanitized evidence](docs/validation-live.json). Deterministic real-SDK tests and installed-tarball tests cover unsafe fallbacks and plugin ordering.
 
