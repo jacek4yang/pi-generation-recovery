@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pi: ["1.0.1"] # single current baseline; older versions are not supported
+        pi: ["1.0.2"] # tested floor; runtime also accepts stable 1.0.x patches
     env:
       PI_TEST_VERSION: ${{ matrix.pi }}
       PI_OFFLINE: "1"

@@ -28,6 +28,7 @@ export type Script = {
   fail?: boolean;
   terminalError?: string;
   hold?: boolean;
+  disconnect?: boolean;
 };
 export async function harness(
   options: {
@@ -165,11 +166,12 @@ export async function harness(
         output_index: index,
         item: { ...item, arguments: "" },
       });
-      send({
-        type: "response.function_call_arguments.delta",
-        output_index: index,
-        delta: script.tool.args,
-      });
+      for (let i = 0; i < script.tool.args.length; i += 1024)
+        send({
+          type: "response.function_call_arguments.delta",
+          output_index: index,
+          delta: script.tool.args.slice(i, i + 1024),
+        });
       if (!script.tool.partial)
         send({ type: "response.output_item.done", output_index: index, item });
       output.push(item);
@@ -197,7 +199,8 @@ export async function harness(
         },
       });
     // Premature EOF, no response.completed: deterministic interrupted stream.
-    if (!script.hold) res.end();
+    if (script.disconnect) setTimeout(() => res.destroy(), 40);
+    else if (!script.hold) res.end();
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
