@@ -1,23 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { VERSION } from "@earendil-works/pi-coding-agent";
-import { assertSupportedPi, SUPPORTED_PI } from "../src/compatibility.js";
-test("actual SDK version matches the audited lifecycle; other versions fail clearly", () => {
-  assert.equal(SUPPORTED_PI, "~1.0.2");
+import { assertRecoveryCapabilities } from "../src/compatibility.js";
+
+test("CI SDK stays reproducible; host version labels do not gate capabilities", () => {
   if (process.env.PI_TEST_VERSION)
     assert.equal(VERSION, process.env.PI_TEST_VERSION);
-  for (const version of [VERSION, "1.0.2", "1.0.3", "1.0.12"])
-    assert.doesNotThrow(() => assertSupportedPi(version));
+  const api = Object.fromEntries(
+    [
+      "on",
+      "appendEntry",
+      "sendMessage",
+      "getAllTools",
+      "getActiveTools",
+      "getThinkingLevel",
+    ].map((key) => [key, () => {}]),
+  );
   for (const version of [
-    "0.99.0",
-    "1.0.0",
-    "1.0.1",
+    VERSION,
     "1.1.0",
     "2.0.0",
-    "1.0.0-beta",
-    "1.0.2-beta",
-    "1.0.02",
-  ]) {
-    assert.throws(() => assertSupportedPi(version), /Recovery is disabled/);
-  }
+    "2.0.0-beta",
+    "custom-build",
+  ])
+    assert.doesNotThrow(() => assertRecoveryCapabilities({ ...api, version }));
+  assert.throws(
+    () => assertRecoveryCapabilities({ ...api, sendMessage: undefined }),
+    /requires Pi APIs: sendMessage/,
+  );
+  assert.throws(() => assertRecoveryCapabilities(null), /Recovery is disabled/);
 });

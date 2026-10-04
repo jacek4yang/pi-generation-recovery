@@ -2,7 +2,7 @@
 
 ## Current baseline
 
-Node >=24; tested floor **Pi coding-agent and pi-ai 1.0.2**. Peers and runtime accept stable **~1.0.2** (>=1.0.2, <1.1.0), without reviving support for older baselines. CI pins 1.0.2; accepting a future patch is not a claim that it was tested. Prereleases and new minor versions fail closed. Historical validation JSON files describe earlier releases, not current support.
+Node >=24; tested floor **Pi coding-agent and pi-ai 1.0.2**. Pi peer versions are unrestricted (`*`); runtime checks required APIs, not version labels. CI/dev dependencies pin 1.0.2 for reproducibility only. Users may upgrade independently, including minor/major releases; absence of a version gate is not a compatibility guarantee. Historical validation JSON files describe earlier releases, not current support.
 
 A future baseline change requires public SDK retry/omission, healthy-equivalence, unsafe-tail, chained-recovery and installed-artifact regressions before changing peers and the guard. No private Pi imports or monkey patches. Pi remains the sole retry owner.
 
