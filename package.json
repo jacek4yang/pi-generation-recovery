@@ -1,6 +1,6 @@
 {
   "name": "pi-generation-recovery",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "State-aware Pi generation recovery with private assistant-frame checkpoints",
   "type": "module",
   "license": "MIT",
@@ -30,12 +30,12 @@
     "live": "tsx scripts/live.ts"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "1.0.1",
-    "@earendil-works/pi-coding-agent": "1.0.1"
+    "@earendil-works/pi-ai": "~1.0.2",
+    "@earendil-works/pi-coding-agent": "~1.0.2"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.0.1",
-    "@earendil-works/pi-coding-agent": "1.0.1",
+    "@earendil-works/pi-ai": "1.0.2",
+    "@earendil-works/pi-coding-agent": "1.0.2",
     "@types/node": "^24.0.0",
     "eslint": "^9.0.0",
     "jiti": "^2.6.1",

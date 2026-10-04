@@ -8,11 +8,11 @@ npm pack --json
 npm run smoke
 ```
 
-`check` runs strict TypeScript, ESLint and deterministic Node tests. Tests use the actual pinned Pi 1.0.1 SDK and Codex Responses provider with a local HTTP/SSE fault server and fake isolated credentials. Deterministic tests are offline. The packaged smoke installs the actual tarball into a temporary environment, rewrites test imports to installed source, and runs the same suite plus actual optional companions. It does not accidentally test checkout source.
+`check` runs strict TypeScript, ESLint and deterministic Node tests. Tests use the actual pinned Pi 1.0.2 SDK and Codex Responses provider with a local HTTP/SSE fault server and fake isolated credentials. Deterministic tests are offline. The packaged smoke installs the actual tarball into a temporary environment, rewrites test imports to installed source, and runs the same suite plus actual optional companions. It does not accidentally test checkout source.
 
 Coverage includes healthy request equivalence, disabled/exhausted retries, no output, partial/complete reasoning, Unicode/Markdown prefixes, semantic continuation, interrupted tools, repeated interruption, abort/non-retryable failure, canonical future requests, stale identity, headroom, journal errors, corruption/truncation, abrupt writer exit, observer privacy, plugin ordering and reopen. GC tests cover age, quota ordering, active attempts within otherwise collectible sessions, stale leases, permissions, errors, invalid/disabled configuration, symlinks and parent-directory replacement races.
 
-The SDK contract tests demonstrate `message_end` before persistence, `turn_end` afterward, Pi-owned failed-assistant omission before retry context, and the danger of using boundary continuations (which can bypass disabled retry). CI pins the exact supported SDK; only 1.0.1 was published/installed at validation.
+The SDK contract tests demonstrate `message_end` before persistence, `turn_end` afterward, Pi-owned failed-assistant omission before retry context, and the danger of using boundary continuations (which can bypass disabled retry). CI pins the exact supported SDK; only 1.0.2 was published/installed at validation.
 
 ## Live opt-in and bounded soak
 

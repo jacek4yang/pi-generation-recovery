@@ -27,6 +27,20 @@ for (const [name, script, count] of [
     2,
   ],
   [
+    "terminated socket during long tool arguments",
+    {
+      reasoning: ["complete", "complete"],
+      tool: {
+        name: "codebuffer",
+        args: '{"code":"DO_NOT_EXECUTE' + "x".repeat(65536),
+        partial: true,
+      },
+      fail: true,
+      disconnect: true,
+    },
+    2,
+  ],
+  [
     "completed text then partial tool",
     {
       reasoning: "complete",

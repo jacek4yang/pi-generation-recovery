@@ -27,7 +27,7 @@ import {
 } from "./state.js";
 
 const INSTRUCTION =
-  "The preceding assistant prefix is committed output from this same interrupted generation. Continue from that safe frontier; do not regenerate or summarize the committed prefix. Preserve its decisions and completed reasoning state. Any incomplete reasoning or tool-call tail was discarded, not executed. Generate any necessary next tool call afresh. Finish the original task with unchanged quality. Do not repeat tool actions from the transcript.";
+  "The preceding assistant prefix is committed output from this same interrupted generation. Continue from that safe frontier; do not regenerate or summarize the committed prefix. Preserve its decisions and completed reasoning state. Any incomplete reasoning or tool-call tail was discarded, not executed. Generate any necessary next tool call afresh; prefer smaller independently valid calls and retained-source edits instead of reproducing a large discarded tool argument. Finish the original task with unchanged quality. Do not repeat tool actions from the transcript.";
 interface Pending {
   checkpoint: GenerationCheckpoint;
   prefix: AssistantMessage;
@@ -95,6 +95,12 @@ export function generationRecovery(options: CaptureOptions = {}) {
           0,
           (metrics.fallbackReasons[old] ?? 0) - 1,
         );
+      if (reason && reason !== old)
+        pi.appendEntry(OWNER, {
+          state: "fallback",
+          attemptId: cp.attemptId,
+          reason,
+        });
       if (reason) {
         reasons.set(cp, reason);
         metrics.fallbackReasons[reason] =

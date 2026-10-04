@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Test Pi 1.0.2; peers/runtime accept stable ~1.0.2 patches.
+- Persist allowlisted fallback reasons and guide continuation toward smaller valid calls/retained-source edits.
+- Real socket termination during 64 KiB tool arguments: replay only completed reasoning, never partial tool JSON. This does not promise uninterrupted transport or lossless regeneration of an unfinished tool call.
+
 ## 0.2.1 — Pi 1.0.1 baseline
 
 - Require exactly Pi/AI 1.0.1; old versions are deliberately unsupported, not handled through compatibility branches.

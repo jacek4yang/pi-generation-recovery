@@ -1,7 +1,7 @@
-/** Exact public lifecycle baseline, expanded only alongside SDK regression evidence. */
-export const SUPPORTED_PI = "1.0.1";
+/** Tested floor; accept stable patches of the same public API minor line. */
+export const SUPPORTED_PI = "~1.0.2";
 export function assertSupportedPi(version: string): void {
-  if (version !== SUPPORTED_PI)
+  if (!/^1\.0\.(?:[2-9]|[1-9]\d+)$/.test(version))
     throw new Error(
       `pi-generation-recovery supports Pi ${SUPPORTED_PI}; found ${version}. Recovery is disabled: validate the retry/omission lifecycle before upgrading.`,
     );
